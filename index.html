@@ -337,6 +337,7 @@ function modal(title,body,okLabel,onOk){
 /* ============ Router ============ */
 const app=$('#app');
 async function route(){
+  stopCam();
   await flushSave();
   const parts=(location.hash.slice(1)||'/').split('/').filter(Boolean);
   window.scrollTo(0,0);
@@ -506,7 +507,7 @@ function renderUnit(c,type,n){
     <label class="fld"><span>Anteckning (vad som avviker)</span><textarea data-k="notes">${esc(u.notes||'')}</textarea></label>
     <div class="fld"><span>Foton</span>
       <div class="actions" style="margin:0">
-        <label class="btn primary">📷 Ta foto<input type="file" accept="image/*" capture="environment" hidden data-photo></label>
+        <button type="button" class="btn primary" data-act="camera">📷 Ta foto</button><input type="file" accept="image/*" capture="environment" hidden data-photo id="capInput">
         <label class="btn">🖼 Välj bild<input type="file" accept="image/*" multiple hidden data-photo></label>
       </div>
       <div class="thumbs" id="thumbs"></div>
@@ -532,18 +533,60 @@ async function loadThumbs(){
   for(const id of u.photos){const p=await dbGet('photos',id);if(p)html+=`<button type="button" class="thumb" data-pid="${id}"><img src="${p.dataUrl}" alt="Foto"></button>`;}
   if($('#thumbs')===el)el.innerHTML=html;
 }
+async function savePhotoData(dataUrl){
+  if(!curUnit)return false;
+  const {c,type,n}=curUnit;const u=ensureUnit(c,type,n);
+  const id=uid();
+  await dbPut('photos',{id,customerId:c.id,dataUrl,ts:Date.now()});
+  u.photos.push(id);touch(c,u);scheduleSave(c);
+  await loadThumbs();
+  return true;
+}
 async function addPhotos(files){
   if(!curUnit||!files.length)return;
-  const {c,type,n}=curUnit;const u=ensureUnit(c,type,n);
   let added=0;
   for(const f of files){
-    try{
-      const dataUrl=await compress(f);const id=uid();
-      await dbPut('photos',{id,customerId:c.id,dataUrl,ts:Date.now()});
-      u.photos.push(id);added++;
-    }catch(e){toast(e.message||'Kunde inte spara bilden');}
+    try{await savePhotoData(await compress(f));added++;}
+    catch(e){toast(e.message||'Kunde inte spara bilden');}
   }
-  if(added){touch(c,u);scheduleSave(c);await loadThumbs();toast(added>1?added+' bilder sparade':'Bild sparad');}
+  if(added)toast(added>1?added+' bilder sparade':'Bild sparad');
+}
+/* Webbkamera (dator). På mobil används telefonens egen kameraapp. */
+let camStream=null;
+function stopCam(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  const o=$('#camModal');if(o)o.remove();
+}
+async function openWebcam(){
+  if(!curUnit)return;
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+  }catch(e){
+    toast('Kunde inte starta kameran. Välj en bild i stället.');
+    $('#capInput').click();return;
+  }
+  camStream=stream;
+  const o=document.createElement('div');o.id='camModal';o.className='modal';
+  o.innerHTML=`<div class="sheet" style="max-width:720px"><h2>Ta foto</h2>
+    <video id="camVideo" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;max-height:60vh"></video>
+    <div class="meta" id="camCount" style="margin:6px 0 0;min-height:20px"></div>
+    <div class="mbtns"><button class="btn" id="camClose">Klar</button><button class="btn primary" id="camShot">📷 Ta foto</button></div></div>`;
+  document.body.appendChild(o);
+  const v=$('#camVideo',o);v.srcObject=stream;
+  let n=0;
+  $('#camClose',o).onclick=stopCam;
+  $('#camShot',o).onclick=async()=>{
+    if(!v.videoWidth){toast('Kameran är inte redo än');return;}
+    const sc=Math.min(1,1280/Math.max(v.videoWidth,v.videoHeight));
+    const cv=document.createElement('canvas');cv.width=Math.round(v.videoWidth*sc);cv.height=Math.round(v.videoHeight*sc);
+    cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+    try{await savePhotoData(cv.toDataURL('image/jpeg',0.72));n++;$('#camCount',o).textContent=n+' bild'+(n>1?'er':'')+' sparad'+(n>1?'e':'');}
+    catch(e){toast('Kunde inte spara bilden');}
+  };
+}
+function useNativeCamera(){
+  return !(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
 }
 let lbId=null;
 async function openLightbox(id){
@@ -719,6 +762,7 @@ document.addEventListener('click',async e=>{
   }else if(act==='export'&&c){await exportCustomer(c);route();}
   else if(act==='delete'&&c){deleteCustomer(c);}
   else if(act==='import'){$('#importFile').click();}
+  else if(act==='camera'){if(useNativeCamera())$('#capInput').click();else openWebcam();}
   else if(act==='print'){window.print();}
   else if(act==='dlreport'&&c){downloadReport(c);}
 });
