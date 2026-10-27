@@ -83,6 +83,7 @@
   .fld>span{display:block;font-size:13px;font-weight:600;color:var(--soft);margin-bottom:6px}
   .fld input,.fld textarea{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;font-size:16px}
   .fld textarea{min-height:110px;resize:vertical}
+  .fld select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff;font-size:16px}
   .seg{display:flex;flex-wrap:wrap;gap:6px}
   .seg button{flex:1 1 auto;min-height:46px;padding:0 12px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:14px;font-weight:600;cursor:pointer}
   .seg button.on.v-ok{background:var(--okbg);border-color:var(--save);color:var(--save)}
@@ -170,6 +171,7 @@ const TYPES={
   robot:{label:'Robot',plural:'Robotar',fields:[
     {k:'serial',l:'Robot-ID / serienummer',t:'text'},
     {k:'sw',l:'Mjukvaruversion',t:'text'},
+    {k:'mfg',l:'Manufactured year & month',t:'mfg'},
     {k:'battery',l:'Batteri',t:'orig'},
     {k:'motors',l:'Motorer',t:'orig'},
     {k:'belts',l:'Remmar',t:'orig'},
@@ -178,10 +180,12 @@ const TYPES={
   port:{label:'Port',plural:'Portar',fields:[
     {k:'serial',l:'Port-ID / serienummer',t:'text'},
     {k:'sw',l:'Mjukvaruversion',t:'text'},
+    {k:'mfg',l:'Manufactured year & month',t:'mfg'},
     {k:'parts',l:'Delar',t:'orig'},
     {k:'cond',l:'Skick',t:'cond'}]},
   charger:{label:'Laddare',plural:'Laddare',fields:[
     {k:'serial',l:'Laddar-ID / serienummer',t:'text'},
+    {k:'mfg',l:'Manufactured year & month',t:'mfg'},
     {k:'parts',l:'Delar',t:'orig'},
     {k:'cond',l:'Skick',t:'cond'}]}
 };
@@ -252,6 +256,18 @@ async function flushSave(){
 }
 window.addEventListener('visibilitychange',()=>{if(document.hidden)flushSave();});
 window.addEventListener('pagehide',flushSave);
+
+/* ============ Tillverkningsdatum ============ */
+const MONTHS=['01','02','03','04','05','06','07','08','09','10','11','12'];
+function mfgYears(){const y=new Date().getFullYear(),a=[];for(let i=y;i>=2010;i--)a.push(String(i));return a;}
+function mfgStr(u){if(!u)return '';if(u.mfgY&&u.mfgM)return u.mfgY+'/'+u.mfgM;if(u.mfgY)return u.mfgY;if(u.mfgM)return '–/'+u.mfgM;return '';}
+function mfgHTML(f,u){
+  const ys=mfgYears();
+  return `<div class="fld"><span>${f.l} <em style="font-weight:400">(valfritt)</em></span><div class="two">
+    <select data-k="mfgY" aria-label="År"><option value="">År</option>${ys.map(y=>`<option value="${y}"${u.mfgY===y?' selected':''}>${y}</option>`).join('')}</select>
+    <select data-k="mfgM" aria-label="Månad"><option value="">Månad</option>${MONTHS.map(m=>`<option value="${m}"${u.mfgM===m?' selected':''}>${m}</option>`).join('')}</select>
+  </div></div>`;
+}
 
 /* ============ Data ============ */
 let customers=[];
@@ -495,7 +511,7 @@ function renderUnit(c,type,n){
   document.title=`${T.label} ${n} – ${c.name}`;
   const fields=T.fields.map(f=>f.t==='text'
     ?`<label class="fld"><span>${f.l}</span><input data-k="${f.k}" value="${esc(u[f.k]||'')}" autocomplete="off" autocapitalize="characters"></label>`
-    :segHTML(f,u)).join('');
+    :f.t==='mfg'?mfgHTML(f,u):segHTML(f,u)).join('');
   app.innerHTML=`
   <header class="top">
     <a class="ib" href="#/c/${c.id}/${type}" aria-label="Till listan">‹</a>
@@ -671,7 +687,7 @@ function buildReport(c,pm){
       if(!u||(st!=='warn'&&st!=='bad'&&!(u.photos&&u.photos.length)))continue;
       any=true;
       h+=`<div class="unit"><h3>${T.label} ${i}${u.serial?' – '+esc(u.serial):''} ${stTag(st)}</h3>
-      <table>${T.fields.filter(f=>f.t!=='text'||f.k==='sw').map(f=>`<tr><th style="width:30%">${f.l}</th><td>${f.t==='text'?esc(u[f.k]||'–'):tagHTML(u[f.k])}</td></tr>`).join('')}
+      <table>${T.fields.filter(f=>f.t!=='text'||f.k==='sw').map(f=>`<tr><th style="width:30%">${f.l}</th><td>${f.t==='text'?esc(u[f.k]||'–'):f.t==='mfg'?esc(mfgStr(u)||'–'):tagHTML(u[f.k])}</td></tr>`).join('')}
       <tr><th>Anteckning</th><td>${esc(u.notes||'–').replace(/\n/g,'<br>')}</td></tr>
       <tr><th>Inventerad av / datum</th><td>${esc(u.by||'–')} · ${esc(u.date||'–')}</td></tr></table>
       ${(u.photos&&u.photos.length)?`<div class="photos">${u.photos.map(id=>pm[id]?`<img src="${pm[id]}" alt="Foto">`:'').join('')}</div>`:''}</div>`;
@@ -682,11 +698,11 @@ function buildReport(c,pm){
   h+='<h2>Bilaga – alla enheter</h2>';
   for(const t of TKEYS){
     const T=TYPES[t];const og=T.fields.filter(f=>f.t==='orig');
-    h+=`<h3>${T.plural} (${c.counts[t]||0})</h3><table><tr><th class="c">Nr</th><th>ID / serienr</th>${og.map(f=>`<th>${f.l}</th>`).join('')}<th>Skick</th><th class="c">Foto</th><th>Anteckning</th></tr>`;
+    h+=`<h3>${T.plural} (${c.counts[t]||0})</h3><table><tr><th class="c">Nr</th><th>ID / serienr</th><th>Tillverkad</th>${og.map(f=>`<th>${f.l}</th>`).join('')}<th>Skick</th><th class="c">Foto</th><th>Anteckning</th></tr>`;
     for(let i=1;i<=(c.counts[t]||0);i++){
       const u=c.units[unitKey(t,i)];const st=unitStatus(t,u);
-      if(!u||!u.touched){h+=`<tr><td class="c">${i}</td><td colspan="${og.length+4}"><span class="tg t-none">Ej inventerad</span></td></tr>`;continue;}
-      h+=`<tr><td class="c">${i}</td><td>${esc(u.serial||'')}</td>${og.map(f=>`<td>${tagHTML(u[f.k])}</td>`).join('')}<td>${u.cond?tagHTML(u.cond):stTag(st)}</td><td class="c">${(u.photos||[]).length||''}</td><td>${esc((u.notes||'').slice(0,140))}</td></tr>`;
+      if(!u||!u.touched){h+=`<tr><td class="c">${i}</td><td colspan="${og.length+5}"><span class="tg t-none">Ej inventerad</span></td></tr>`;continue;}
+      h+=`<tr><td class="c">${i}</td><td>${esc(u.serial||'')}</td><td>${esc(mfgStr(u))}</td>${og.map(f=>`<td>${tagHTML(u[f.k])}</td>`).join('')}<td>${u.cond?tagHTML(u.cond):stTag(st)}</td><td class="c">${(u.photos||[]).length||''}</td><td>${esc((u.notes||'').slice(0,140))}</td></tr>`;
     }
     h+='</table>';
   }
