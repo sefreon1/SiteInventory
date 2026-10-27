@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16283a">
+<title>Inventering första service</title>
+<style>
+  :root{
+    --ink:#16283a; --soft:#52626f; --line:#d5dde3; --wash:#eef2f5; --bg:#f4f6f8;
+    --save:#176b45; --okbg:#e4f2ea;
+    --warn:#8a5a00; --warnbg:#fbf0d9;
+    --bad:#a12626; --badbg:#f8d7d7;
+    --blue:#26537a; --bluebg:#e3edf6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.4;padding-bottom:env(safe-area-inset-bottom)}
+  a{color:inherit}
+  button,input,select,textarea{font:inherit;color:inherit}
+
+  /* Top bar */
+  .top{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;display:flex;align-items:center;gap:10px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));min-height:54px}
+  .top .ttl{flex:1;min-width:0}
+  .top h1{font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top .sub{font-size:12px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ib{background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:8px;min-width:42px;height:42px;font-size:18px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:0 12px}
+  .ib.off{opacity:.35;pointer-events:none}
+  #saveState{font-size:12px;opacity:.9;white-space:nowrap}
+
+  main{max-width:980px;margin:0 auto;padding:14px}
+  .banner{padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:12px}
+  .banner.bad{background:var(--badbg);color:var(--bad)}
+  .banner.warn{background:var(--warnbg);color:var(--warn)}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none}
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  .btn.green{background:var(--save);border-color:var(--save);color:#fff}
+  .btn.danger{color:var(--bad)}
+  .btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+
+  /* Cards */
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card h3{font-size:16px}
+  .meta{font-size:13px;color:var(--soft)}
+  .bar{height:8px;background:var(--wash);border-radius:4px;overflow:hidden;margin:10px 0 6px}
+  .bar>i{display:block;height:100%;background:var(--save)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .tag.warn{background:var(--warnbg);color:var(--warn)}
+  .tag.ok{background:var(--okbg);color:var(--save)}
+  .empty{text-align:center;color:var(--soft);padding:36px 12px}
+  .foot{font-size:12px;color:var(--soft);text-align:center;margin-top:18px}
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;overflow-x:auto;margin:6px 0 12px;padding-bottom:2px}
+  .tabs a{flex:1;min-width:max-content;text-align:center;text-decoration:none;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid var(--line);font-weight:600;font-size:14px}
+  .tabs a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tabs small{display:block;font-weight:500;font-size:11px;opacity:.8}
+
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .tools input[type=search]{flex:1;min-width:140px;min-height:40px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:#fff}
+  .pills{display:flex;gap:6px}
+  .pills button{min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;cursor:pointer}
+  .pills button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* Unit grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
+  .chip{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:62px;padding:6px 4px;border-radius:10px;border:2px solid var(--line);background:#fff;text-decoration:none;text-align:center}
+  .chip b{font-size:18px;line-height:1.1}
+  .chip span{font-size:10px;color:var(--soft);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip i{position:absolute;top:2px;right:4px;font-style:normal;font-size:10px;color:var(--soft)}
+  .chip.st-part{border-color:var(--blue);background:var(--bluebg)}
+  .chip.st-ok{border-color:var(--save);background:var(--okbg)}
+  .chip.st-warn{border-color:#c98a1a;background:var(--warnbg)}
+  .chip.st-bad{border-color:var(--bad);background:var(--badbg)}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--soft);margin-bottom:10px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;border:2px solid var(--line);vertical-align:-2px;margin-right:4px}
+
+  /* Unit form */
+  .fld{display:block;margin-bottom:16px}
+  .fld>span{display:block;font-size:13px;font-weight:600;color:var(--soft);margin-bottom:6px}
+  .fld input,.fld textarea{width:100%;min-height:46px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;font-size:16px}
+  .fld textarea{min-height:110px;resize:vertical}
+  .seg{display:flex;flex-wrap:wrap;gap:6px}
+  .seg button{flex:1 1 auto;min-height:46px;padding:0 12px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  .seg button.on.v-ok{background:var(--okbg);border-color:var(--save);color:var(--save)}
+  .seg button.on.v-warn{background:var(--warnbg);border-color:#c98a1a;color:var(--warn)}
+  .seg button.on.v-bad{background:var(--badbg);border-color:var(--bad);color:var(--bad)}
+  .seg button.on.v-none{background:var(--wash);border-color:var(--soft);color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
+  .thumb{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;padding:0;cursor:pointer;aspect-ratio:4/3}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .unitnav{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;gap:8px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));z-index:15}
+  .unitnav .btn{flex:1}
+  .unitnav .btn.off{opacity:.4;pointer-events:none}
+
+  /* Summary table */
+  table.sum{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+  table.sum th,table.sum td{border:1px solid var(--line);padding:8px;text-align:center}
+  table.sum th:first-child,table.sum td:first-child{text-align:left}
+  table.sum th{background:var(--wash);font-size:12px}
+  .scroll{overflow-x:auto}
+  h2.sec{font-size:15px;margin:18px 0 8px}
+
+  /* Modal + lightbox */
+  .modal{position:fixed;inset:0;background:rgba(10,20,30,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  .sheet{background:#fff;width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:16px;max-height:92vh;overflow:auto}
+  @media(min-width:640px){.modal{align-items:center}.sheet{border-radius:16px}}
+  .sheet h2{font-size:18px;margin-bottom:12px}
+  .mbtns{display:flex;gap:8px;margin-top:10px}
+  .mbtns .btn{flex:1}
+  #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px}
+  #lightbox[hidden]{display:none}
+  #lightbox img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:6px}
+  #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:70;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+  #toast.show{opacity:1}
+
+  /* Report */
+  .rbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .report{background:#fff;max-width:900px;margin:0 auto;padding:24px;font-size:12px;color:#16283a}
+  .report h1{font-size:22px;margin-bottom:2px}
+  .report h2{font-size:15px;margin:20px 0 8px;padding-bottom:4px;border-bottom:2px solid #16283a}
+  .report h3{font-size:13px;margin:12px 0 6px}
+  .report .meta2{color:#52626f;font-size:12px}
+  .report table{width:100%;border-collapse:collapse;margin:6px 0}
+  .report th,.report td{border:1px solid #d5dde3;padding:4px 6px;text-align:left;font-size:11px;vertical-align:top}
+  .report th{background:#eef2f5}
+  .report td.c,.report th.c{text-align:center}
+  .report .tg{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;white-space:nowrap}
+  .report .t-ok{background:#e4f2ea;color:#176b45}
+  .report .t-warn{background:#fbf0d9;color:#8a5a00}
+  .report .t-bad{background:#f8d7d7;color:#a12626}
+  .report .t-none{background:#eef2f5;color:#52626f}
+  .report .unit{break-inside:avoid;border:1px solid #d5dde3;margin:10px 0;padding:10px}
+  .report .unit h3{margin-top:0}
+  .report .photos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+  .report .photos img{width:100%;aspect-ratio:4/3;object-fit:cover;border:1px solid #d5dde3}
+  .report .so{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  .report .so div{border-top:1px solid #16283a;padding-top:4px;min-height:34px}
+  @media print{
+    body{background:#fff}
+    .noprint,.top,.unitnav,#toast{display:none !important}
+    main{padding:0;max-width:none}
+    .report{padding:0}
+    @page{size:A4;margin:12mm}
+  }
+</style>
+<style id="reportCss"></style>
+</head>
+<body>
+<div id="app"></div>
+<div id="lightbox" hidden>
+  <img id="lbImg" alt="">
+  <div class="actions" style="margin:0">
+    <button class="btn" id="lbClose">Stäng</button>
+    <button class="btn danger" id="lbDel">Ta bort bild</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ============ Konfiguration ============ */
+const ORIG=['Original','Icke-original','Oklart','Ej kontrollerat'];
+const COND=['OK','Avvikelse','Defekt'];
+const SEGCLS={'Original':'ok','Icke-original':'bad','Oklart':'warn','Ej kontrollerat':'none','OK':'ok','Avvikelse':'warn','Defekt':'bad'};
+const TYPES={
+  robot:{label:'Robot',plural:'Robotar',fields:[
+    {k:'serial',l:'Robot-ID / serienummer',t:'text'},
+    {k:'sw',l:'Mjukvaruversion',t:'text'},
+    {k:'battery',l:'Batteri',t:'orig'},
+    {k:'motors',l:'Motorer',t:'orig'},
+    {k:'belts',l:'Remmar',t:'orig'},
+    {k:'other',l:'Övriga delar',t:'orig'},
+    {k:'cond',l:'Skick',t:'cond'}]},
+  port:{label:'Port',plural:'Portar',fields:[
+    {k:'serial',l:'Port-ID / serienummer',t:'text'},
+    {k:'sw',l:'Mjukvaruversion',t:'text'},
+    {k:'parts',l:'Delar',t:'orig'},
+    {k:'cond',l:'Skick',t:'cond'}]},
+  charger:{label:'Laddare',plural:'Laddare',fields:[
+    {k:'serial',l:'Laddar-ID / serienummer',t:'text'},
+    {k:'parts',l:'Delar',t:'orig'},
+    {k:'cond',l:'Skick',t:'cond'}]}
+};
+const TKEYS=Object.keys(TYPES);
+const STATUS_LABEL={none:'Ej inventerad',part:'Påbörjad',ok:'OK',warn:'Avvikelse',bad:'Defekt / icke-original'};
+
+/* ============ Hjälpfunktioner ============ */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+const todayStr=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+const fmtDT=t=>t?new Date(t).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'}):'–';
+const slug=s=>String(s||'kund').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_|_$/g,'')||'kund';
+let toastTimer;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600);}
+function download(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(u)},1500);}
+function lsGet(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+
+/* ============ Lagring (IndexedDB, med minnesreserv) ============ */
+let dbp=null,memOnly=false;
+const mem={customers:new Map(),photos:new Map()};
+function getDB(){
+  if(dbp)return dbp;
+  dbp=new Promise((res,rej)=>{
+    try{
+      const r=indexedDB.open('nakd-inventering',1);
+      r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('customers',{keyPath:'id'});d.createObjectStore('photos',{keyPath:'id'});};
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>rej(r.error);
+      r.onblocked=()=>rej(new Error('blocked'));
+    }catch(e){rej(e)}
+  });
+  return dbp;
+}
+async function dbPut(store,val){
+  if(memOnly){mem[store].set(val.id,val);return;}
+  const db=await getDB();
+  return new Promise((res,rej)=>{const t=db.transaction(store,'readwrite');t.objectStore(store).put(val);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);});
+}
+async function dbGet(store,key){
+  if(memOnly)return mem[store].get(key);
+  const db=await getDB();
+  return new Promise((res,rej)=>{const r=db.transaction(store).objectStore(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+}
+async function dbAll(store){
+  if(memOnly)return [...mem[store].values()];
+  const db=await getDB();
+  return new Promise((res,rej)=>{const r=db.transaction(store).objectStore(store).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+}
+async function dbDel(store,key){
+  if(memOnly){mem[store].delete(key);return;}
+  const db=await getDB();
+  return new Promise((res,rej)=>{const t=db.transaction(store,'readwrite');t.objectStore(store).delete(key);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});
+}
+
+/* ============ Autospar ============ */
+let saveTimer=null,pending=null;
+function setSaveState(s){const el=$('#saveState');if(!el)return;el.textContent=s==='saving'?'Sparar…':s==='saved'?'Sparat ✓':s==='error'?'Fel vid sparning':'';}
+function scheduleSave(c){pending=c;setSaveState('saving');clearTimeout(saveTimer);saveTimer=setTimeout(flushSave,350);}
+async function flushSave(){
+  clearTimeout(saveTimer);
+  if(!pending)return;
+  const c=pending;pending=null;
+  c.updatedAt=Date.now();
+  try{await dbPut('customers',c);setSaveState('saved');}
+  catch(e){setSaveState('error');toast('Kunde inte spara: '+(e.message||e));}
+}
+window.addEventListener('visibilitychange',()=>{if(document.hidden)flushSave();});
+window.addEventListener('pagehide',flushSave);
+
+/* ============ Data ============ */
+let customers=[];
+let ui={tab:'robot',filter:'all',q:''};
+const getC=id=>customers.find(c=>c.id===id);
+function newCustomer({name,site,inspector,counts}){
+  const now=Date.now();
+  return {id:uid(),name,site,inspector,counts,units:{},signoff:{custName:'',custDate:'',elName:'',elDate:''},createdAt:now,updatedAt:now,exportedAt:0};
+}
+function unitKey(t,n){return t+'-'+n;}
+function ensureUnit(c,t,n){
+  const k=unitKey(t,n);
+  if(!c.units[k])c.units[k]={photos:[]};
+  const u=c.units[k];
+  if(!u.photos)u.photos=[];
+  return u;
+}
+function touch(c,u){
+  if(!u.touched){u.touched=true;if(!u.by)u.by=c.inspector||'';if(!u.date)u.date=todayStr();}
+}
+function unitStatus(type,u){
+  if(!u||!u.touched)return 'none';
+  const origs=TYPES[type].fields.filter(f=>f.t==='orig').map(f=>u[f.k]);
+  if(origs.includes('Icke-original')||u.cond==='Defekt')return 'bad';
+  if(origs.includes('Oklart')||u.cond==='Avvikelse')return 'warn';
+  if(u.cond==='OK')return 'ok';
+  return 'part';
+}
+function stats(c){
+  const out={};
+  for(const t of TKEYS){
+    const n=c.counts[t]||0;
+    const s={total:n,none:0,part:0,ok:0,warn:0,bad:0,photos:0,nonOrigUnits:0,unclearUnits:0,orig:{}};
+    const ofs=TYPES[t].fields.filter(f=>f.t==='orig');
+    ofs.forEach(f=>{s.orig[f.k]={'Original':0,'Icke-original':0,'Oklart':0,'Ej kontrollerat':0}});
+    for(let i=1;i<=n;i++){
+      const u=c.units[unitKey(t,i)];
+      s[unitStatus(t,u)]++;
+      if(u){
+        s.photos+=(u.photos||[]).length;
+        let no=false,un=false;
+        ofs.forEach(f=>{const v=u[f.k];if(v&&s.orig[f.k][v]!==undefined)s.orig[f.k][v]++;if(v==='Icke-original')no=true;if(v==='Oklart')un=true;});
+        if(no)s.nonOrigUnits++;
+        if(un)s.unclearUnits++;
+      }
+    }
+    s.inv=s.ok+s.warn+s.bad;
+    out[t]=s;
+  }
+  return out;
+}
+function totals(c){const s=stats(c);let inv=0,tot=0;TKEYS.forEach(t=>{inv+=s[t].inv;tot+=s[t].total});return{inv,tot,pct:tot?Math.round(inv/tot*100):0};}
+
+/* ============ Bilder ============ */
+function compress(file,max=1280,q=0.72){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);const img=new Image();
+    img.onload=()=>{
+      let w=img.naturalWidth,h=img.naturalHeight;const s=Math.min(1,max/Math.max(w,h));
+      w=Math.round(w*s);h=Math.round(h*s);
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);res(cv.toDataURL('image/jpeg',q));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Kunde inte läsa bilden'));};
+    img.src=url;
+  });
+}
+
+/* ============ Modal ============ */
+function modal(title,body,okLabel,onOk){
+  const o=document.createElement('div');o.className='modal';
+  o.innerHTML=`<div class="sheet"><h2>${esc(title)}</h2><div>${body}</div><div class="mbtns"><button class="btn" data-m="cancel">Avbryt</button><button class="btn primary" data-m="ok">${esc(okLabel)}</button></div></div>`;
+  document.body.appendChild(o);
+  o.addEventListener('click',e=>{
+    if(e.target===o||e.target.dataset.m==='cancel'){o.remove();}
+    else if(e.target.dataset.m==='ok'){Promise.resolve(onOk(o)).then(r=>{if(r!==false)o.remove();});}
+  });
+  const f=o.querySelector('input');if(f)f.focus();
+  return o;
+}
+
+/* ============ Router ============ */
+const app=$('#app');
+async function route(){
+  await flushSave();
+  const parts=(location.hash.slice(1)||'/').split('/').filter(Boolean);
+  window.scrollTo(0,0);
+  if(!parts.length)return renderHome();
+  if(parts[0]==='c'){
+    const c=getC(parts[1]);
+    if(!c){location.hash='#/';return;}
+    if(parts[2]==='u')return renderUnit(c,parts[3],parseInt(parts[4],10));
+    if(parts[2]==='report')return renderReport(c);
+    if(TKEYS.includes(parts[2])||parts[2]==='summary'){if(ui.tab!==parts[2]){ui.tab=parts[2];ui.filter='all';ui.q='';}}
+    return renderCustomer(c);
+  }
+  renderHome();
+}
+window.addEventListener('hashchange',route);
+
+/* ============ Startsida ============ */
+function cardHTML(c){
+  const t=totals(c);
+  const dirty=c.updatedAt>(c.exportedAt||0);
+  return `<div class="card">
+    <h3>${esc(c.name)}</h3>
+    <div class="meta">${esc(c.site||'Ingen anläggning angiven')}</div>
+    <div class="bar"><i style="width:${t.pct}%"></i></div>
+    <div class="meta">${t.inv} av ${t.tot} enheter inventerade (${t.pct} %) · Senast ändrad ${fmtDT(c.updatedAt)}</div>
+    <div style="margin:8px 0">${dirty?'<span class="tag warn">Ändrat sedan senaste export</span>':'<span class="tag ok">Exporterad</span>'}</div>
+    <div class="actions" style="margin:0">
+      <a class="btn primary" href="#/c/${c.id}/robot">Öppna</a>
+      <button class="btn" data-act="export" data-id="${c.id}">Exportera</button>
+      <button class="btn danger" data-act="delete" data-id="${c.id}">Radera</button>
+    </div>
+  </div>`;
+}
+function renderHome(){
+  document.title='Inventering första service';
+  const list=customers.slice().sort((a,b)=>b.updatedAt-a.updatedAt);
+  app.innerHTML=`
+  <header class="top"><div class="ttl"><h1>Inventering första service</h1><div class="sub">Kunder och anläggningar</div></div></header>
+  <main>
+    ${memOnly?'<div class="banner bad">Lokal lagring är inte tillgänglig i den här webbläsaren (till exempel i privat läge). Data försvinner när sidan stängs, så exportera ofta.</div>':''}
+    <div class="actions">
+      <button class="btn primary" data-act="new">+ Ny kund</button>
+      <button class="btn" data-act="import">Importera</button>
+      <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
+    </div>
+    ${list.length?list.map(cardHTML).join(''):'<p class="empty">Inga kunder än.<br>Skapa en ny kund för att börja inventera. All data sparas lokalt på den här enheten och kan exporteras.</p>'}
+    <p class="foot" id="storageInfo"></p>
+  </main>`;
+  if(navigator.storage&&navigator.storage.estimate){
+    navigator.storage.estimate().then(e=>{const el=$('#storageInfo');if(el&&e.usage!=null)el.textContent=`Lagringsutrymme som används på enheten: ${(e.usage/1048576).toFixed(1)} MB`;});
+  }
+}
+function customerForm(c){
+  const v=c||{name:'',site:'',inspector:lsGet('inv_inspector'),counts:{robot:151,port:30,charger:50}};
+  return `
+  <label class="fld"><span>Kund *</span><input id="f_name" value="${esc(v.name)}" autocomplete="off"></label>
+  <label class="fld"><span>Anläggning / site</span><input id="f_site" value="${esc(v.site)}" autocomplete="off"></label>
+  <label class="fld"><span>Inventerad av (förifylls på alla enheter)</span><input id="f_insp" value="${esc(v.inspector)}" autocomplete="off"></label>
+  <div class="two">
+    <label class="fld"><span>Antal robotar</span><input id="f_robot" type="number" min="0" inputmode="numeric" value="${v.counts.robot}"></label>
+    <label class="fld"><span>Antal portar</span><input id="f_port" type="number" min="0" inputmode="numeric" value="${v.counts.port}"></label>
+  </div>
+  <label class="fld"><span>Antal laddare</span><input id="f_charger" type="number" min="0" inputmode="numeric" value="${v.counts.charger}"></label>`;
+}
+function readForm(o){
+  const g=id=>o.querySelector('#'+id).value.trim();
+  const n=id=>Math.max(0,Math.min(2000,parseInt(g(id),10)||0));
+  return{name:g('f_name'),site:g('f_site'),inspector:g('f_insp'),counts:{robot:n('f_robot'),port:n('f_port'),charger:n('f_charger')}};
+}
+
+/* ============ Kundvy ============ */
+function chipHTML(c,t,i){
+  const u=c.units[unitKey(t,i)];const st=unitStatus(t,u);
+  const np=u&&u.photos?u.photos.length:0;
+  return `<a class="chip st-${st}" href="#/c/${c.id}/u/${t}/${i}"><b>${i}</b><span>${esc((u&&u.serial)||'')}</span>${np?`<i>📷${np}</i>`:''}</a>`;
+}
+function gridHTML(c,t){
+  const n=c.counts[t]||0;const q=ui.q.toLowerCase();let out='';
+  for(let i=1;i<=n;i++){
+    const u=c.units[unitKey(t,i)];const st=unitStatus(t,u);
+    if(ui.filter==='none'&&st!=='none'&&st!=='part')continue;
+    if(ui.filter==='dev'&&st!=='warn'&&st!=='bad')continue;
+    if(q&&!(String(i)===q||String(i).startsWith(q)||((u&&u.serial)||'').toLowerCase().includes(q)))continue;
+    out+=chipHTML(c,t,i);
+  }
+  return out||'<p class="empty" style="grid-column:1/-1">Inga enheter att visa.</p>';
+}
+function renderCustomer(c){
+  document.title=c.name+' – Inventering';
+  const s=stats(c),tt=totals(c);
+  const tabs=TKEYS.map(t=>`<a class="${ui.tab===t?'on':''}" href="#/c/${c.id}/${t}">${TYPES[t].plural}<small>${s[t].inv}/${s[t].total}</small></a>`).join('')
+    +`<a class="${ui.tab==='summary'?'on':''}" href="#/c/${c.id}/summary">Sammanfattning</a>`;
+  let body='';
+  if(ui.tab==='summary')body=summaryHTML(c,s);
+  else body=`
+    <div class="tools">
+      <input type="search" id="q" placeholder="Sök nummer eller serienummer" value="${esc(ui.q)}">
+      <div class="pills">
+        <button data-f="all" class="${ui.filter==='all'?'on':''}">Alla</button>
+        <button data-f="none" class="${ui.filter==='none'?'on':''}">Ej klara</button>
+        <button data-f="dev" class="${ui.filter==='dev'?'on':''}">Avvikelser</button>
+      </div>
+    </div>
+    <div class="legend"><span><i></i>Ej inventerad</span><span><i style="border-color:var(--blue);background:var(--bluebg)"></i>Påbörjad</span><span><i style="border-color:var(--save);background:var(--okbg)"></i>OK</span><span><i style="border-color:#c98a1a;background:var(--warnbg)"></i>Avvikelse / oklart</span><span><i style="border-color:var(--bad);background:var(--badbg)"></i>Defekt / icke-original</span></div>
+    <div class="grid" id="grid">${gridHTML(c,ui.tab)}</div>`;
+  app.innerHTML=`
+  <header class="top"><a class="ib" href="#/" aria-label="Tillbaka">‹</a><div class="ttl"><h1>${esc(c.name)}</h1><div class="sub">${esc(c.site||'')}</div></div><span id="saveState"></span></header>
+  <main>
+    <div class="card" style="padding:12px">
+      <div class="meta">${tt.inv} av ${tt.tot} enheter inventerade (${tt.pct} %)</div>
+      <div class="bar"><i style="width:${tt.pct}%"></i></div>
+      <div class="actions" style="margin:8px 0 0">
+        <a class="btn green sm" href="#/c/${c.id}/report">Skapa rapport</a>
+        <button class="btn sm" data-act="export" data-id="${c.id}">Exportera</button>
+        <button class="btn sm" data-act="edit" data-id="${c.id}">Redigera kund</button>
+      </div>
+    </div>
+    <nav class="tabs">${tabs}</nav>
+    ${body}
+  </main>`;
+}
+function summaryHTML(c,s){
+  const rows=TKEYS.map(t=>`<tr><td>${TYPES[t].plural}</td><td>${s[t].total}</td><td>${s[t].inv}</td><td>${s[t].ok}</td><td>${s[t].warn}</td><td>${s[t].bad}</td><td>${s[t].total-s[t].inv}</td><td>${s[t].photos}</td></tr>`).join('');
+  const ofs=TYPES.robot.fields.filter(f=>f.t==='orig');
+  const prow=ofs.map(f=>`<tr><td>${f.l}</td>${ORIG.map(o=>`<td>${s.robot.orig[f.k][o]}</td>`).join('')}</tr>`).join('');
+  const r=s.robot;const pct=r.inv?Math.round(r.nonOrigUnits/r.inv*100):0;
+  const so=c.signoff||{};
+  return `
+  <h2 class="sec">Översikt</h2>
+  <div class="scroll"><table class="sum"><tr><th>Typ</th><th>Totalt</th><th>Inventerade</th><th>OK</th><th>Avvikelse</th><th>Defekt</th><th>Kvar</th><th>Foton</th></tr>${rows}</table></div>
+  <h2 class="sec">Robotar – delar</h2>
+  <div class="scroll"><table class="sum"><tr><th>Del</th>${ORIG.map(o=>`<th>${o}</th>`).join('')}</tr>${prow}</table></div>
+  <p class="meta" style="margin-top:8px">Robotar med minst en icke-original del: <b>${r.nonOrigUnits}</b> (${pct} % av inventerade). Med minst en oklar del: <b>${r.unclearUnits}</b>.</p>
+  <h2 class="sec">Kvittering</h2>
+  <div class="card">
+    <div class="two"><label class="fld"><span>Kund (namn)</span><input data-so="custName" value="${esc(so.custName)}"></label><label class="fld"><span>Datum</span><input type="date" data-so="custDate" value="${esc(so.custDate)}"></label></div>
+    <div class="two"><label class="fld"><span>Element Logic (namn)</span><input data-so="elName" value="${esc(so.elName)}"></label><label class="fld"><span>Datum</span><input type="date" data-so="elDate" value="${esc(so.elDate)}"></label></div>
+    <p class="meta">Kvitteringen visas i rapporten. Rapporten är underlag vid framtida diskussioner om upptid och ansvar.</p>
+  </div>`;
+}
+
+/* ============ Enhetsvy ============ */
+function segHTML(f,u){
+  const opts=f.t==='cond'?COND:ORIG;
+  return `<div class="fld"><span>${f.l}</span><div class="seg" data-k="${f.k}">${opts.map(o=>`<button type="button" class="v-${SEGCLS[o]}${u[f.k]===o?' on':''}" data-v="${o}">${o}</button>`).join('')}</div></div>`;
+}
+let curUnit=null;
+function renderUnit(c,type,n){
+  if(!TYPES[type]){location.hash='#/c/'+c.id+'/robot';return;}
+  const max=c.counts[type]||0;
+  if(!(n>=1&&n<=max)){location.hash='#/c/'+c.id+'/'+type;return;}
+  const u=c.units[unitKey(type,n)]||{photos:[]};
+  curUnit={c,type,n};
+  const T=TYPES[type];
+  document.title=`${T.label} ${n} – ${c.name}`;
+  const fields=T.fields.map(f=>f.t==='text'
+    ?`<label class="fld"><span>${f.l}</span><input data-k="${f.k}" value="${esc(u[f.k]||'')}" autocomplete="off" autocapitalize="characters"></label>`
+    :segHTML(f,u)).join('');
+  app.innerHTML=`
+  <header class="top">
+    <a class="ib" href="#/c/${c.id}/${type}" aria-label="Till listan">‹</a>
+    <div class="ttl"><h1>${T.label} ${n}</h1><div class="sub">${esc(c.name)} · ${n} av ${max}</div></div>
+    <span id="saveState"></span>
+  </header>
+  <main>
+    ${fields}
+    <label class="fld"><span>Anteckning (vad som avviker)</span><textarea data-k="notes">${esc(u.notes||'')}</textarea></label>
+    <div class="fld"><span>Foton</span>
+      <div class="actions" style="margin:0">
+        <label class="btn primary">📷 Ta foto<input type="file" accept="image/*" capture="environment" hidden data-photo></label>
+        <label class="btn">🖼 Välj bild<input type="file" accept="image/*" multiple hidden data-photo></label>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+    <div class="two">
+      <label class="fld"><span>Inventerad av</span><input data-k="by" value="${esc(u.by||c.inspector||'')}" autocomplete="off"></label>
+      <label class="fld"><span>Datum</span><input type="date" data-k="date" value="${esc(u.date||todayStr())}"></label>
+    </div>
+    <div style="height:70px"></div>
+  </main>
+  <div class="unitnav">
+    <a class="btn ${n<=1?'off':''}" href="#/c/${c.id}/u/${type}/${n-1}">‹ Föregående</a>
+    ${n<max?`<a class="btn primary" href="#/c/${c.id}/u/${type}/${n+1}">Nästa ›</a>`:`<a class="btn green" href="#/c/${c.id}/${type}">Klar – till listan</a>`}
+  </div>`;
+  loadThumbs();
+}
+async function loadThumbs(){
+  if(!curUnit)return;
+  const {c,type,n}=curUnit;const u=c.units[unitKey(type,n)];const el=$('#thumbs');
+  if(!el)return;
+  if(!u||!u.photos||!u.photos.length){el.innerHTML='';return;}
+  let html='';
+  for(const id of u.photos){const p=await dbGet('photos',id);if(p)html+=`<button type="button" class="thumb" data-pid="${id}"><img src="${p.dataUrl}" alt="Foto"></button>`;}
+  if($('#thumbs')===el)el.innerHTML=html;
+}
+async function addPhotos(files){
+  if(!curUnit||!files.length)return;
+  const {c,type,n}=curUnit;const u=ensureUnit(c,type,n);
+  let added=0;
+  for(const f of files){
+    try{
+      const dataUrl=await compress(f);const id=uid();
+      await dbPut('photos',{id,customerId:c.id,dataUrl,ts:Date.now()});
+      u.photos.push(id);added++;
+    }catch(e){toast(e.message||'Kunde inte spara bilden');}
+  }
+  if(added){touch(c,u);scheduleSave(c);await loadThumbs();toast(added>1?added+' bilder sparade':'Bild sparad');}
+}
+let lbId=null;
+async function openLightbox(id){
+  const p=await dbGet('photos',id);if(!p)return;
+  lbId=id;$('#lbImg').src=p.dataUrl;$('#lightbox').hidden=false;
+}
+$('#lbClose').addEventListener('click',()=>{$('#lightbox').hidden=true;lbId=null;});
+$('#lbDel').addEventListener('click',async()=>{
+  if(!lbId||!curUnit)return;
+  if(!confirm('Ta bort bilden?'))return;
+  const {c,type,n}=curUnit;const u=c.units[unitKey(type,n)];
+  u.photos=u.photos.filter(x=>x!==lbId);
+  await dbDel('photos',lbId);
+  scheduleSave(c);$('#lightbox').hidden=true;lbId=null;loadThumbs();
+});
+
+/* ============ Export / import ============ */
+async function exportCustomer(c){
+  await flushSave();
+  const photos={};
+  for(const u of Object.values(c.units))for(const id of (u.photos||[])){const p=await dbGet('photos',id);if(p)photos[id]=p;}
+  const data={format:'nakd-inventering',version:1,exportedAt:new Date().toISOString(),customer:c,photos};
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  download(blob,`Inventering_${slug(c.name)}_${todayStr()}.json`);
+  c.exportedAt=Date.now();
+  await dbPut('customers',c);
+  toast('Exporterad. Spara filen i SharePoint.');
+}
+async function importFiles(files){
+  let n=0;
+  for(const f of files){
+    try{
+      const d=JSON.parse(await f.text());
+      if(d.format!=='nakd-inventering'||!d.customer||!d.customer.id)throw new Error('Filen är inte en inventeringsfil');
+      const c=d.customer;
+      const ex=getC(c.id);
+      if(ex&&!confirm(`Kunden "${ex.name}" finns redan på den här enheten (senast ändrad ${fmtDT(ex.updatedAt)}).\nFilen är senast ändrad ${fmtDT(c.updatedAt)}.\n\nErsätta med filens data?`))continue;
+      for(const p of Object.values(d.photos||{}))await dbPut('photos',p);
+      c.exportedAt=Date.now();
+      await dbPut('customers',c);n++;
+    }catch(e){toast(`Kunde inte importera ${f.name}: ${e.message||e}`);}
+  }
+  customers=await dbAll('customers');
+  renderHome();
+  if(n)toast(n+' kund(er) importerad(e)');
+}
+async function deleteCustomer(c){
+  if(!confirm(`Radera "${c.name}" och alla bilder från den här enheten?\n\nExportera först om du vill behålla datan.`))return;
+  for(const u of Object.values(c.units))for(const id of (u.photos||[]))await dbDel('photos',id);
+  await dbDel('customers',c.id);
+  customers=customers.filter(x=>x.id!==c.id);
+  renderHome();
+}
+
+/* ============ Rapport ============ */
+function tagHTML(v){if(!v)return '<span class="tg t-none">–</span>';return `<span class="tg t-${SEGCLS[v]||'none'}">${esc(v)}</span>`;}
+function stTag(st){const cls=st==='ok'?'ok':st==='warn'?'warn':st==='bad'?'bad':'none';return `<span class="tg t-${cls}">${STATUS_LABEL[st]}</span>`;}
+function buildReport(c,pm){
+  const s=stats(c),tt=totals(c);
+  const insp=[...new Set(Object.values(c.units).map(u=>u.by).filter(Boolean))].join(', ')||c.inspector||'–';
+  const dates=Object.values(c.units).map(u=>u.date).filter(Boolean).sort();
+  const period=dates.length?(dates[0]===dates[dates.length-1]?dates[0]:dates[0]+' – '+dates[dates.length-1]):'–';
+  let h=`<h1>Inventeringsrapport – ${esc(c.name)}</h1>
+  <div class="meta2">${esc(c.site||'')}${c.site?' · ':''}Inventerad av: ${esc(insp)} · Period: ${esc(period)} · Rapport skapad ${fmtDT(Date.now())}</div>
+  <h2>Sammanfattning</h2>
+  <table><tr><th>Typ</th><th class="c">Totalt</th><th class="c">Inventerade</th><th class="c">OK</th><th class="c">Avvikelse</th><th class="c">Defekt</th><th class="c">Ej inventerade</th><th class="c">Foton</th></tr>
+  ${TKEYS.map(t=>`<tr><td>${TYPES[t].plural}</td><td class="c">${s[t].total}</td><td class="c">${s[t].inv}</td><td class="c">${s[t].ok}</td><td class="c">${s[t].warn}</td><td class="c">${s[t].bad}</td><td class="c">${s[t].total-s[t].inv}</td><td class="c">${s[t].photos}</td></tr>`).join('')}
+  <tr><th>Totalt</th><th class="c">${tt.tot}</th><th class="c">${tt.inv}</th><th colspan="5"></th></tr></table>`;
+  const ofs=TYPES.robot.fields.filter(f=>f.t==='orig');
+  const r=s.robot;const pct=r.inv?Math.round(r.nonOrigUnits/r.inv*100):0;
+  h+=`<h3>Robotar – delarnas ursprung</h3>
+  <table><tr><th>Del</th>${ORIG.map(o=>`<th class="c">${o}</th>`).join('')}</tr>
+  ${ofs.map(f=>`<tr><td>${f.l}</td>${ORIG.map(o=>`<td class="c">${r.orig[f.k][o]}</td>`).join('')}</tr>`).join('')}</table>
+  <p>Robotar med minst en icke-original del: <b>${r.nonOrigUnits}</b> (${pct} % av inventerade robotar). Robotar med minst en oklar del: <b>${r.unclearUnits}</b>.</p>`;
+  // Detaljer
+  h+='<h2>Avvikelser och bilder</h2>';
+  let any=false;
+  for(const t of TKEYS){
+    const T=TYPES[t];
+    for(let i=1;i<=(c.counts[t]||0);i++){
+      const u=c.units[unitKey(t,i)];const st=unitStatus(t,u);
+      if(!u||(st!=='warn'&&st!=='bad'&&!(u.photos&&u.photos.length)))continue;
+      any=true;
+      h+=`<div class="unit"><h3>${T.label} ${i}${u.serial?' – '+esc(u.serial):''} ${stTag(st)}</h3>
+      <table>${T.fields.filter(f=>f.t!=='text'||f.k==='sw').map(f=>`<tr><th style="width:30%">${f.l}</th><td>${f.t==='text'?esc(u[f.k]||'–'):tagHTML(u[f.k])}</td></tr>`).join('')}
+      <tr><th>Anteckning</th><td>${esc(u.notes||'–').replace(/\n/g,'<br>')}</td></tr>
+      <tr><th>Inventerad av / datum</th><td>${esc(u.by||'–')} · ${esc(u.date||'–')}</td></tr></table>
+      ${(u.photos&&u.photos.length)?`<div class="photos">${u.photos.map(id=>pm[id]?`<img src="${pm[id]}" alt="Foto">`:'').join('')}</div>`:''}</div>`;
+    }
+  }
+  if(!any)h+='<p>Inga avvikelser eller bilder registrerade.</p>';
+  // Bilaga
+  h+='<h2>Bilaga – alla enheter</h2>';
+  for(const t of TKEYS){
+    const T=TYPES[t];const og=T.fields.filter(f=>f.t==='orig');
+    h+=`<h3>${T.plural} (${c.counts[t]||0})</h3><table><tr><th class="c">Nr</th><th>ID / serienr</th>${og.map(f=>`<th>${f.l}</th>`).join('')}<th>Skick</th><th class="c">Foto</th><th>Anteckning</th></tr>`;
+    for(let i=1;i<=(c.counts[t]||0);i++){
+      const u=c.units[unitKey(t,i)];const st=unitStatus(t,u);
+      if(!u||!u.touched){h+=`<tr><td class="c">${i}</td><td colspan="${og.length+4}"><span class="tg t-none">Ej inventerad</span></td></tr>`;continue;}
+      h+=`<tr><td class="c">${i}</td><td>${esc(u.serial||'')}</td>${og.map(f=>`<td>${tagHTML(u[f.k])}</td>`).join('')}<td>${u.cond?tagHTML(u.cond):stTag(st)}</td><td class="c">${(u.photos||[]).length||''}</td><td>${esc((u.notes||'').slice(0,140))}</td></tr>`;
+    }
+    h+='</table>';
+  }
+  const so=c.signoff||{};
+  h+=`<h2>Kvittering</h2><div class="so"><div>Kund: ${esc(so.custName||'')} ${so.custDate?'· '+esc(so.custDate):''}</div><div>Element Logic: ${esc(so.elName||'')} ${so.elDate?'· '+esc(so.elDate):''}</div></div>`;
+  return h;
+}
+async function photoMap(c){
+  const pm={};
+  for(const u of Object.values(c.units))for(const id of (u.photos||[])){const p=await dbGet('photos',id);if(p)pm[id]=p.dataUrl;}
+  return pm;
+}
+async function renderReport(c){
+  document.title='Rapport – '+c.name;
+  app.innerHTML=`<header class="top noprint"><a class="ib" href="#/c/${c.id}/summary" aria-label="Tillbaka">‹</a><div class="ttl"><h1>Rapport</h1><div class="sub">${esc(c.name)}</div></div></header>
+  <main><div class="rbar noprint">
+    <button class="btn primary" data-act="print">Skriv ut / spara som PDF</button>
+    <button class="btn" data-act="dlreport" data-id="${c.id}">Ladda ner som HTML</button>
+  </div><div class="report" id="reportBody"><p>Skapar rapport…</p></div></main>`;
+  const pm=await photoMap(c);
+  const el=$('#reportBody');if(el)el.innerHTML=buildReport(c,pm);
+}
+async function downloadReport(c){
+  const pm=await photoMap(c);
+  const css=$('#reportCss').textContent;
+  const html=`<!DOCTYPE html><html lang="sv"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventeringsrapport – ${esc(c.name)}</title><style>${css}body{font-family:system-ui,"Segoe UI",Arial,sans-serif;margin:0;background:#fff}@page{size:A4;margin:12mm}</style></head><body><div class="report">${buildReport(c,pm)}</div></body></html>`;
+  download(new Blob([html],{type:'text/html'}),`Rapport_${slug(c.name)}_${todayStr()}.html`);
+  toast('Rapport nedladdad');
+}
+
+/* ============ Händelser ============ */
+document.addEventListener('click',async e=>{
+  const t=e.target;
+  // Segmentknappar
+  const sb=t.closest('.seg button');
+  if(sb&&curUnit){
+    const seg=sb.parentElement;const k=seg.dataset.k;const v=sb.dataset.v;
+    const {c,type,n}=curUnit;const u=ensureUnit(c,type,n);
+    u[k]=(u[k]===v)?'':v;touch(c,u);
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',u[k]===b.dataset.v));
+    scheduleSave(c);return;
+  }
+  // Miniatyr
+  const th=t.closest('.thumb');if(th){openLightbox(th.dataset.pid);return;}
+  // Filter
+  const pill=t.closest('.pills button');
+  if(pill){ui.filter=pill.dataset.f;const c=getC(location.hash.split('/')[2]);if(c)renderCustomer(c);return;}
+  // Åtgärder
+  const b=t.closest('[data-act]');if(!b)return;
+  const act=b.dataset.act;const c=b.dataset.id?getC(b.dataset.id):null;
+  if(act==='new'){
+    modal('Ny kund',customerForm(),'Skapa',async o=>{
+      const v=readForm(o);
+      if(!v.name){toast('Ange kundens namn');return false;}
+      lsSet('inv_inspector',v.inspector);
+      const nc=newCustomer(v);
+      await dbPut('customers',nc);customers.push(nc);
+      if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+      location.hash='#/c/'+nc.id+'/robot';
+    });
+  }else if(act==='edit'&&c){
+    modal('Redigera kund',customerForm(c),'Spara',async o=>{
+      const v=readForm(o);
+      if(!v.name){toast('Ange kundens namn');return false;}
+      for(const k of TKEYS){
+        let hi=0;for(let i=1;i<=(c.counts[k]||0);i++){const u=c.units[unitKey(k,i)];if(u&&(u.touched||(u.photos&&u.photos.length)))hi=i;}
+        if(v.counts[k]<hi){toast(`${TYPES[k].plural}: minst ${hi} eftersom enhet ${hi} har data`);return false;}
+      }
+      Object.assign(c,{name:v.name,site:v.site,inspector:v.inspector,counts:v.counts});
+      lsSet('inv_inspector',v.inspector);
+      scheduleSave(c);await flushSave();renderCustomer(c);
+    });
+  }else if(act==='export'&&c){await exportCustomer(c);route();}
+  else if(act==='delete'&&c){deleteCustomer(c);}
+  else if(act==='import'){$('#importFile').click();}
+  else if(act==='print'){window.print();}
+  else if(act==='dlreport'&&c){downloadReport(c);}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='importFile'){importFiles([...t.files]);t.value='';return;}
+  if(t.matches&&t.matches('input[data-photo]')){addPhotos([...t.files]);t.value='';}
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='q'){ui.q=t.value.trim();const c=getC(location.hash.split('/')[2]);const g=$('#grid');if(c&&g)g.innerHTML=gridHTML(c,ui.tab);return;}
+  if(t.dataset&&t.dataset.k&&curUnit){
+    const {c,type,n}=curUnit;const u=ensureUnit(c,type,n);
+    u[t.dataset.k]=t.value;touch(c,u);scheduleSave(c);return;
+  }
+  if(t.dataset&&t.dataset.so){
+    const c=getC(location.hash.split('/')[2]);if(!c)return;
+    c.signoff=c.signoff||{};c.signoff[t.dataset.so]=t.value;scheduleSave(c);
+  }
+});
+
+/* ============ Start ============ */
+(async function init(){
+  $('#reportCss').textContent=[...document.styleSheets[0].cssRules].filter(r=>r.cssText.includes('.report')&&!r.cssText.startsWith('@media')).map(r=>r.cssText).join('\n');
+  try{await getDB();customers=await dbAll('customers');}
+  catch(e){memOnly=true;customers=[];}
+  route();
+})();
+</script>
+</body>
+</html>
