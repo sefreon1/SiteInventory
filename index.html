@@ -175,6 +175,8 @@ const TYPES={
     {k:'battery',l:'Batteri',t:'orig'},
     {k:'motors',l:'Motorer',t:'orig'},
     {k:'belts',l:'Remmar',t:'orig'},
+    {k:'liftgear',l:'Liftgear',t:'orig'},
+    {k:'reelkit',l:'Reel kit',t:'orig'},
     {k:'other',l:'Övriga delar',t:'orig'},
     {k:'cond',l:'Skick',t:'cond'}]},
   port:{label:'Port',plural:'Portar',fields:[
@@ -186,6 +188,8 @@ const TYPES={
   charger:{label:'Laddare',plural:'Laddare',fields:[
     {k:'serial',l:'Laddar-ID / serienummer',t:'text'},
     {k:'mfg',l:'Manufactured year & month',t:'mfg'},
+    {k:'connector',l:'Laddkontakt',t:'orig'},
+    {k:'fuse',l:'Säkring',t:'orig'},
     {k:'parts',l:'Delar',t:'orig'},
     {k:'cond',l:'Skick',t:'cond'}]}
 };
@@ -477,16 +481,18 @@ function renderCustomer(c){
 }
 function summaryHTML(c,s){
   const rows=TKEYS.map(t=>`<tr><td>${TYPES[t].plural}</td><td>${s[t].total}</td><td>${s[t].inv}</td><td>${s[t].ok}</td><td>${s[t].warn}</td><td>${s[t].bad}</td><td>${s[t].total-s[t].inv}</td><td>${s[t].photos}</td></tr>`).join('');
-  const ofs=TYPES.robot.fields.filter(f=>f.t==='orig');
-  const prow=ofs.map(f=>`<tr><td>${f.l}</td>${ORIG.map(o=>`<td>${s.robot.orig[f.k][o]}</td>`).join('')}</tr>`).join('');
-  const r=s.robot;const pct=r.inv?Math.round(r.nonOrigUnits/r.inv*100):0;
+  const partsHTML=TKEYS.map(t=>{
+    const ofs=TYPES[t].fields.filter(f=>f.t==='orig');const r=s[t];
+    const pct=r.inv?Math.round(r.nonOrigUnits/r.inv*100):0;
+    return `<h2 class="sec">${TYPES[t].plural} – delar</h2>
+    <div class="scroll"><table class="sum"><tr><th>Del</th>${ORIG.map(o=>`<th>${o}</th>`).join('')}</tr>${ofs.map(f=>`<tr><td>${f.l}</td>${ORIG.map(o=>`<td>${r.orig[f.k][o]}</td>`).join('')}</tr>`).join('')}</table></div>
+    <p class="meta" style="margin-top:8px">${TYPES[t].plural} med minst en icke-original del: <b>${r.nonOrigUnits}</b> (${pct} % av inventerade). Med minst en oklar del: <b>${r.unclearUnits}</b>.</p>`;
+  }).join('');
   const so=c.signoff||{};
   return `
   <h2 class="sec">Översikt</h2>
   <div class="scroll"><table class="sum"><tr><th>Typ</th><th>Totalt</th><th>Inventerade</th><th>OK</th><th>Avvikelse</th><th>Defekt</th><th>Kvar</th><th>Foton</th></tr>${rows}</table></div>
-  <h2 class="sec">Robotar – delar</h2>
-  <div class="scroll"><table class="sum"><tr><th>Del</th>${ORIG.map(o=>`<th>${o}</th>`).join('')}</tr>${prow}</table></div>
-  <p class="meta" style="margin-top:8px">Robotar med minst en icke-original del: <b>${r.nonOrigUnits}</b> (${pct} % av inventerade). Med minst en oklar del: <b>${r.unclearUnits}</b>.</p>
+  ${partsHTML}
   <h2 class="sec">Kvittering</h2>
   <div class="card">
     <div class="two"><label class="fld"><span>Kund (namn)</span><input data-so="custName" value="${esc(so.custName)}"></label><label class="fld"><span>Datum</span><input type="date" data-so="custDate" value="${esc(so.custDate)}"></label></div>
@@ -671,12 +677,14 @@ function buildReport(c,pm){
   <table><tr><th>Typ</th><th class="c">Totalt</th><th class="c">Inventerade</th><th class="c">OK</th><th class="c">Avvikelse</th><th class="c">Defekt</th><th class="c">Ej inventerade</th><th class="c">Foton</th></tr>
   ${TKEYS.map(t=>`<tr><td>${TYPES[t].plural}</td><td class="c">${s[t].total}</td><td class="c">${s[t].inv}</td><td class="c">${s[t].ok}</td><td class="c">${s[t].warn}</td><td class="c">${s[t].bad}</td><td class="c">${s[t].total-s[t].inv}</td><td class="c">${s[t].photos}</td></tr>`).join('')}
   <tr><th>Totalt</th><th class="c">${tt.tot}</th><th class="c">${tt.inv}</th><th colspan="5"></th></tr></table>`;
-  const ofs=TYPES.robot.fields.filter(f=>f.t==='orig');
-  const r=s.robot;const pct=r.inv?Math.round(r.nonOrigUnits/r.inv*100):0;
-  h+=`<h3>Robotar – delarnas ursprung</h3>
-  <table><tr><th>Del</th>${ORIG.map(o=>`<th class="c">${o}</th>`).join('')}</tr>
-  ${ofs.map(f=>`<tr><td>${f.l}</td>${ORIG.map(o=>`<td class="c">${r.orig[f.k][o]}</td>`).join('')}</tr>`).join('')}</table>
-  <p>Robotar med minst en icke-original del: <b>${r.nonOrigUnits}</b> (${pct} % av inventerade robotar). Robotar med minst en oklar del: <b>${r.unclearUnits}</b>.</p>`;
+  for(const t of TKEYS){
+    const ofs=TYPES[t].fields.filter(f=>f.t==='orig');const r=s[t];
+    const pct=r.inv?Math.round(r.nonOrigUnits/r.inv*100):0;
+    h+=`<h3>${TYPES[t].plural} – delarnas ursprung</h3>
+    <table><tr><th>Del</th>${ORIG.map(o=>`<th class="c">${o}</th>`).join('')}</tr>
+    ${ofs.map(f=>`<tr><td>${f.l}</td>${ORIG.map(o=>`<td class="c">${r.orig[f.k][o]}</td>`).join('')}</tr>`).join('')}</table>
+    <p>${TYPES[t].plural} med minst en icke-original del: <b>${r.nonOrigUnits}</b> (${pct} % av inventerade). Med minst en oklar del: <b>${r.unclearUnits}</b>.</p>`;
+  }
   // Detaljer
   h+='<h2>Avvikelser och bilder</h2>';
   let any=false;
